@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace WillyBank
 {
@@ -13,9 +12,7 @@ namespace WillyBank
         public List<LoanManager> Loans { get; private set; } = new();
         public List<BankAccount> Accounts { get; private set; } = new();
 
-        /// <summary>
-        /// Load from file
-        /// </summary>
+        // Load from file
         public void LoadData()
         {
             if (File.Exists(filePath))
@@ -31,16 +28,13 @@ namespace WillyBank
             }
         }
 
-        /// <summary>
-        /// Save to file
-        /// </summary>
+        // Save to file
         public void SaveData()
         {
             var data = new BankData { Loans = Loans, Accounts = Accounts };
             string json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(filePath, json);
         }
-
 
         // Loans
         public void AddLoan(string name, decimal amount, Guid accountID)
@@ -65,7 +59,6 @@ namespace WillyBank
                 return;
             }
 
-            // If there are multiple people with same name, pick which one
             int selectedIndex = 0;
             ConsoleKey key;
 
@@ -85,18 +78,11 @@ namespace WillyBank
                 }
 
                 key = Console.ReadKey(true).Key;
-                if (key == ConsoleKey.Enter)
-                {
-                    break;
-                }
+                if (key == ConsoleKey.Enter) break;
                 if (key == ConsoleKey.UpArrow || key == ConsoleKey.W)
-                {
                     selectedIndex = (selectedIndex > 0) ? selectedIndex - 1 : matchingPeople.Count - 1;
-                }
                 else if (key == ConsoleKey.DownArrow || key == ConsoleKey.S)
-                {
                     selectedIndex = (selectedIndex < matchingPeople.Count - 1) ? selectedIndex + 1 : 0;
-                }
             }
 
             string selectedName = matchingPeople[selectedIndex];
@@ -109,7 +95,6 @@ namespace WillyBank
                 return;
             }
 
-            // Choose which loan to pay
             selectedIndex = 0;
             while (true)
             {
@@ -127,8 +112,7 @@ namespace WillyBank
                 }
 
                 key = Console.ReadKey(true).Key;
-                if (key == ConsoleKey.Enter)
-                    break;
+                if (key == ConsoleKey.Enter) break;
                 if (key == ConsoleKey.UpArrow || key == ConsoleKey.W)
                     selectedIndex = (selectedIndex > 0) ? selectedIndex - 1 : selectedLoans.Count - 1;
                 else if (key == ConsoleKey.DownArrow || key == ConsoleKey.S)
@@ -153,7 +137,6 @@ namespace WillyBank
                 Console.ReadKey();
                 Loans.Remove(loan);
             }
-
             SaveData();
         }
 
@@ -167,7 +150,7 @@ namespace WillyBank
             else
             {
                 Console.WriteLine($"{loan.Name} has an active loan for {loan.LoanAmount:C}");
-            }        
+            }
         }
 
         public void ViewAllLoans()
@@ -183,7 +166,6 @@ namespace WillyBank
             {
                 Console.WriteLine($"{loan.Name} | {loan.LoanAmount:C} | Account: {loan.AccountId}");
             }
-
             Console.ReadKey();
         }
 
@@ -197,7 +179,10 @@ namespace WillyBank
 
         public void ViewAccounts(string name)
         {
-            var accounts = Accounts.Where(a => a.OwnerName.Equals(name, StringComparison.OrdinalIgnoreCase)).ToList();
+            var accounts = Accounts
+                .Where(a => a.OwnerName.Equals(name, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
             if (accounts.Count == 0)
             {
                 Console.WriteLine("No accounts found for that name!");
@@ -206,7 +191,7 @@ namespace WillyBank
             }
 
             Console.WriteLine($"Accounts for {name}:");
-            foreach(var account in accounts)
+            foreach (var account in accounts)
             {
                 Console.WriteLine($"{account.AccountId} | Balance: {account.Balance:C}");
             }
@@ -215,7 +200,10 @@ namespace WillyBank
 
         public void TransferMoney(string name)
         {
-            var accounts = Accounts.Where(a => a.OwnerName.Equals(name, StringComparison.OrdinalIgnoreCase)).ToList();
+            var accounts = Accounts
+                .Where(a => a.OwnerName.Equals(name, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
             if (accounts.Count < 2)
             {
                 Console.WriteLine("You need at least 2 accounts to transfer between.");
@@ -225,6 +213,7 @@ namespace WillyBank
 
             Console.WriteLine("Select source account:");
             var source = SelectAccount(accounts);
+
             Console.WriteLine("Select destination account:");
             var destination = SelectAccount(accounts.Where(a => a != source).ToList());
 
@@ -257,6 +246,7 @@ namespace WillyBank
         {
             int selectedIndex = 0;
             ConsoleKey key;
+
             while (true)
             {
                 Console.Clear();
@@ -269,12 +259,12 @@ namespace WillyBank
                         Console.WriteLine($"> {accounts[i].AccountId} | Balance: {accounts[i].Balance:C}");
                         Console.ResetColor();
                     }
-                    else Console.WriteLine($"  {accounts[i].AccountId} | Balance: {accounts[i].Balance:C}");
+                    else
+                        Console.WriteLine($"  {accounts[i].AccountId} | Balance: {accounts[i].Balance:C}");
                 }
 
                 key = Console.ReadKey(true).Key;
-                if (key == ConsoleKey.Enter)
-                    break;
+                if (key == ConsoleKey.Enter) break;
                 if (key == ConsoleKey.UpArrow || key == ConsoleKey.W)
                     selectedIndex = (selectedIndex > 0) ? selectedIndex - 1 : accounts.Count - 1;
                 else if (key == ConsoleKey.DownArrow || key == ConsoleKey.S)
@@ -283,12 +273,5 @@ namespace WillyBank
 
             return accounts[selectedIndex];
         }
-    }
-
-    // Used to serialize all data in one JSON file
-    public class BankData
-    {
-        public List<LoanManager> Loans { get; set; } = new();
-        public List<BankAccount> Accounts { get; set; } = new();
     }
 }
