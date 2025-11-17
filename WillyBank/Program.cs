@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 
@@ -7,357 +6,328 @@ namespace WillyBank
 {
     internal class Program
     {
-        static BankSystem bank;
+        static BankSystem bank;   // Main bank system instance
 
         static void Main()
         {
-            CultureInfo.CurrentCulture = new CultureInfo("sv-SE"); // Sets the currency symbol used later to SEK instead of GBP
+            // Set culture to Swedish for currency formatting
+            CultureInfo.CurrentCulture = new CultureInfo("sv-SE");
 
             bank = new BankSystem();
-            bank.LoadData();
+            bank.LoadData(); // Makes sure that previously saved users, loans and accounts are avalible on startup
 
-            bool running = true;
-            while (running)
-            {
-                List<string> options = new()
-                {
-                    "1. View a Person",
-                    "2. Transfer Money",
-                    "3. Exit"
-                };
-
-                int selectedIndex = 0;
-                Console.CursorVisible = false;
-
-                while (true)
-                {
-                    Console.Clear();
-                    Console.WriteLine("==== Willy Bank ====");
-                    for (int i = 0; i < options.Count; i++)
-                    {
-                        if (i == selectedIndex)
-                        {
-                            Console.ForegroundColor = ConsoleColor.Cyan;
-                            Console.WriteLine($"> {options[i]}");
-                            Console.ResetColor();
-                        }
-                        else
-                        {
-                            Console.WriteLine($"  {options[i]}");
-                        }
-                    }
-
-                    Console.WriteLine("\nUse arrow up/down or w/s to navigate, Enter to select, Esc to exit.");
-
-                    var key = Console.ReadKey(true).Key;
-                    if (key == ConsoleKey.W || key == ConsoleKey.UpArrow)
-                    {
-                        selectedIndex = (selectedIndex > 0) ? selectedIndex - 1 : options.Count - 1;
-                    }
-                    else if (key == ConsoleKey.S || key == ConsoleKey.DownArrow)
-                    {
-                        selectedIndex = (selectedIndex < options.Count - 1) ? selectedIndex + 1 : 0;
-                    }
-                    else if (key == ConsoleKey.Escape)
-                    {
-                        return;
-                    }
-                    else if (key == ConsoleKey.Enter)
-                    {
-                        break;
-                    }
-                }
-
-                Console.Clear();
-                switch (selectedIndex)
-                {
-                    case 0:
-                        ViewPerson();
-                        break;
-                    case 1:
-                        Console.Write("Enter name: ");
-                        bank.TransferMoney(Console.ReadLine());
-                        break;
-                    case 2:
-                        running = false;
-                        return;
-                }
-            }
-        }
-
-        static void ViewPerson()
-        {
             while (true)
             {
-                var people = bank.Accounts.Select(a => a.OwnerName).Distinct().ToList();
-                people.Add("+ Add New Person");
+                Console.Clear();
+                Console.WriteLine("==== Willy Bank Login ====\n");
 
-                if (people.Count == 1) // only "+ Add New Person"
-                {
-                    Console.WriteLine("No people found yet.");
-                }
+                // Build a user list + option to add a new user
+                var userList = bank.Users.Select(u => u.Username).ToList();
+                userList.Add("+ Add User");
 
                 int selectedIndex = 0;
                 ConsoleKey key;
+                Console.CursorVisible = false; // Hide cursor for cleaner look and navigation
+
+                // User selection menu
                 while (true)
                 {
                     Console.Clear();
-                    Console.WriteLine("Select a person:");
-                    for (int i = 0; i < people.Count; i++)
+                    Console.WriteLine("Select a user:");
+                    for (int i = 0; i < userList.Count; i++)
                     {
+                        // Highlight selected user
                         if (i == selectedIndex)
                         {
                             Console.ForegroundColor = ConsoleColor.Cyan;
-                            Console.WriteLine($"> {people[i]}");
+                            Console.WriteLine($"> {userList[i]}");
                             Console.ResetColor();
                         }
-                        else Console.WriteLine($"  {people[i]}");
+                        else Console.WriteLine($"  {userList[i]}");
                     }
 
                     key = Console.ReadKey(true).Key;
+
+                    // Confirm selection
                     if (key == ConsoleKey.Enter)
                     {
                         break;
                     }
+
+                    // Navigation up
                     if (key == ConsoleKey.W || key == ConsoleKey.UpArrow)
                     {
-                        selectedIndex = (selectedIndex > 0) ? selectedIndex - 1 : people.Count - 1;
+                        selectedIndex = (selectedIndex > 0) ? selectedIndex - 1 : userList.Count - 1;
                     }
+                    // Navigation down
                     else if (key == ConsoleKey.S || key == ConsoleKey.DownArrow)
                     {
-                        selectedIndex = (selectedIndex < people.Count - 1) ? selectedIndex + 1 : 0;
-                    }                    
+                        selectedIndex = (selectedIndex < userList.Count - 1) ? selectedIndex + 1 : 0;
+                    }
+                    // Exit program
                     else if (key == ConsoleKey.Escape)
                     {
                         return;
                     }
                 }
+                Console.CursorVisible = true;
 
-                string selectedPerson = people[selectedIndex];
-                if (selectedPerson == "+ Add New Person")
+                string selectedUser = userList[selectedIndex];
+
+                // Create a new user
+                if (selectedUser == "+ Add User")
                 {
-                    Console.Clear();
-                    Console.Write("Enter new person's name: ");
-                    string newName = Console.ReadLine();
+                    CreateNewUser();
+                    continue;
+                }
 
-                    Console.Write("Enter starting balance (optional, press Enter for 0): ");
-                    string balanceInput = Console.ReadLine();
-                    decimal startingBalance = 0;
-                    if (!string.IsNullOrWhiteSpace(balanceInput))
-                    {
-                        decimal.TryParse(balanceInput, out startingBalance);
-                    }
-                        
+                // Password prompt
+                Console.Write($"Enter password for {selectedUser}: ");
+                string password = ReadPassword();
 
-                    bank.AddAccount(newName, startingBalance);
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"Created new person '{newName}' with starting balance {startingBalance:C}");
+                // Authenticate user
+                var user = bank.Authenticate(selectedUser, password);
+                if (user == null)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("\nInvalid password.");
                     Console.ResetColor();
                     Console.ReadKey();
-                    continue; // refresh the person list
+                    continue;
                 }
 
-                PersonMenu(selectedPerson);
+                // Open logged-in menu
+                UserMenu(user);
             }
         }
 
-        static void PersonMenu(string name)
+        // Handles creating new users
+        static void CreateNewUser()
         {
-            List<string> options = new()
+            Console.Clear();
+            Console.Write("Enter username: ");
+            string username = Console.ReadLine();
+
+            // Have to enter the same password twice when creating a user for non accidental passwords
+            Console.Write("Enter password: ");
+            string pass1 = ReadPassword();
+            Console.Write("\nConfirm password: ");
+            string pass2 = ReadPassword();
+
+            // Password mismatch check
+            if (pass1 != pass2)
             {
-                "1. View Accounts",
-                "2. View Loans",
-                "3. Add Account",
-                "4. Pay Loan",
-                "5. Add Loan",
-                "6. Add Balance",
-                "7. Back"
-            };
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("\nPasswords do not match.");
+                Console.ResetColor();
+                Console.ReadKey();
+                return;
+            }
 
-            int selectedIndex = 0;
-            ConsoleKey key;
+            // Try to add user
+            if (!bank.AddUser(username, pass1)) 
+            // Returns false if there is already a username with that name. 
+            //Makes so there are not any conflicts later on in the code when using the name to filter in methods.
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("\nUser already exists.");
+                Console.ResetColor();
+                Console.ReadKey();
+                return;
+            }
 
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("\nUser created successfully!");
+            Console.ResetColor();
+            Console.ReadKey();
+        }
+
+        // Menu shown after login
+        static void UserMenu(User user)
+        {
             while (true)
             {
                 Console.Clear();
-                Console.WriteLine($"=== {name}'s Menu ===");
-                for (int i = 0; i < options.Count; i++)
-                {
-                    if (i == selectedIndex)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine($"> {options[i]}");
-                        Console.ResetColor();
-                    }
-                    else Console.WriteLine($"  {options[i]}");
-                }
+                Console.WriteLine($"=== {user.Username}'s Menu ===");
 
-                key = Console.ReadKey(true).Key;
-                if (key == ConsoleKey.W || key == ConsoleKey.UpArrow)
-                {
-                    selectedIndex = (selectedIndex > 0) ? selectedIndex - 1 : options.Count - 1;
-                }
-                else if (key == ConsoleKey.S || key == ConsoleKey.DownArrow)
-                {
-                    selectedIndex = (selectedIndex < options.Count - 1) ? selectedIndex + 1 : 0;
-                }
-                else if (key == ConsoleKey.Escape)
-                {
-                    return;
-                }
-                else if (key == ConsoleKey.Enter)
+                string[] options = {
+                    "1. View Accounts",
+                    "2. Add Account",
+                    "3. Transfer Money",
+                    "4. View Loans",
+                    "5. Add Loan",
+                    "6. Pay Loan",
+                    "7. Add Balance",
+                    "8. Logout"
+                };
+
+                int selectedIndex = 0;
+                ConsoleKey key;
+                Console.CursorVisible = false;
+
+                // User selects option
+                while (true)
                 {
                     Console.Clear();
-                    switch (selectedIndex)
+                    Console.WriteLine($"=== {user.Username}'s Menu ===");
+
+                    for (int i = 0; i < options.Length; i++)
                     {
-                        case 0:
-                            bank.ViewAccounts(name);
-                            break;
-                        case 1:
-                            bank.ViewLoan(name);
-                            Console.ReadKey();
-                            break;
-                        case 2:
-                            bank.AddAccount(name);
-                            Console.WriteLine("Account added.");
-                            Console.ReadKey();
-                            break;
-                        case 3:
-                            bank.PayLoan(name);
-                            break;
-                        case 4:
-                            AddNewLoan(name);
-                            break;
-                        case 5:
-                            AddBalance(name);
-                            break;
-                        case 6:
-                            return;
+                        // Highlight selection
+                        if (i == selectedIndex)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Yellow;
+                            Console.WriteLine($"> {options[i]}");
+                            Console.ResetColor();
+                        }
+                        else Console.WriteLine($"  {options[i]}");
                     }
+
+                    key = Console.ReadKey(true).Key;
+
+                    if (key == ConsoleKey.Enter)
+                    {
+                        break;
+                    }
+
+                    // Navigation
+                    if (key == ConsoleKey.W || key == ConsoleKey.UpArrow)
+                    {
+                        selectedIndex = (selectedIndex > 0) ? selectedIndex - 1 : options.Length - 1;
+                    }
+                    else if (key == ConsoleKey.S || key == ConsoleKey.DownArrow)
+                    {
+                        selectedIndex = (selectedIndex < options.Length - 1) ? selectedIndex + 1 : 0;
+                    }
+                    else if (key == ConsoleKey.Escape)
+                    {
+                        return;
+                    }
+                }
+                Console.CursorVisible = true;
+
+                ConsoleKey key1;
+                // Handle selected option
+                switch (selectedIndex)
+                {
+                    case 0:
+                        // Show accounts
+                        var accs = bank.GetAccounts(user.Username);
+                        foreach (var acc in accs)
+                        {
+                            Console.WriteLine($"{acc.AccountId} | {acc.Balance:C}");
+                        }
+
+                        Console.WriteLine("Press spacebar to continue");
+                        while ((key1 = Console.ReadKey(true).Key) != ConsoleKey.Spacebar) { }
+                        break;
+
+                    case 1:
+                        // Add account
+                        Console.Write("Enter starting balance: ");
+                        decimal start = decimal.Parse(Console.ReadLine());
+                        bank.AddAccount(user.Username, start);
+                        break;
+
+                    case 2:
+                        // Transfer money
+                        bank.TransferMoney(user.Username);
+                        break;
+
+                    case 3:
+                        // View loan
+                        bank.ViewLoan(user.Username);
+                        Console.ReadKey();
+                        break;
+
+                    case 4:
+                        // Add loan
+                        AddNewLoan(user.Username);
+                        break;
+
+                    case 5:
+                        // Pay loan
+                        bank.PayLoan(user.Username);
+                        break;
+
+                    case 6:
+                        // Add balance to first account
+                        AddBalance(user.Username);
+                        break;
+
+                    case 7:
+                        // Logout
+                        return;
                 }
             }
         }
 
-        static void AddNewLoan(string name)
+        // Create new loan for a user
+        static void AddNewLoan(string username)
         {
-            Console.Write("Enter amount: ");
+            Console.Write("Enter loan amount: ");
             if (!decimal.TryParse(Console.ReadLine(), out decimal amount))
+                return;
+
+            var accs = bank.GetAccounts(username);
+
+            // Need at least one account
+            if (accs.Count == 0)
             {
-                Console.WriteLine("Invalid amount.");
+                Console.WriteLine("You must have an account first.");
                 Console.ReadKey();
                 return;
             }
 
-            var accounts = bank.Accounts.Where(a => a.OwnerName.Equals(name, StringComparison.OrdinalIgnoreCase)).ToList();
-            if (accounts.Count == 0)
-            {
-                Console.WriteLine("This person has no accounts. Please create one first.");
-                Console.ReadKey();
-                return;
-            }
-
-            int selectedIndex = 0;
-            ConsoleKey key;
-            while (true)
-            {
-                Console.Clear();
-                Console.WriteLine($"Select account for {name}:");
-                for (int i = 0; i < accounts.Count; i++)
-                {
-                    if (i == selectedIndex)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.WriteLine($"> {accounts[i].AccountId} | Balance: {accounts[i].Balance:C}");
-                        Console.ResetColor();
-                    }
-                    else Console.WriteLine($"  {accounts[i].AccountId} | Balance: {accounts[i].Balance:C}");
-                }
-
-                key = Console.ReadKey(true).Key;
-                if (key == ConsoleKey.Enter)
-                {
-                    break;
-                }
-                if (key == ConsoleKey.W || key == ConsoleKey.UpArrow)
-                {
-                    selectedIndex = (selectedIndex > 0) ? selectedIndex - 1 : accounts.Count - 1;
-                }
-                else if (key == ConsoleKey.S || key == ConsoleKey.DownArrow)
-                {
-                    selectedIndex = (selectedIndex < accounts.Count - 1) ? selectedIndex + 1 : 0;
-                }
-            }
-
-            var chosenAccount = accounts[selectedIndex];
-            bank.AddLoan(name, amount, chosenAccount.AccountId);
-
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"Loan of {amount:C} added for {name} (Account {chosenAccount.AccountId})");
-            Console.ResetColor();
-            Console.ReadKey();
+            var acc = accs.First();
+            bank.AddLoan(username, amount, acc.AccountId);
         }
 
-        static void AddBalance(string name)
+        // Add balance to user's first account
+        static void AddBalance(string username)
         {
-            var accounts = bank.Accounts.Where(a => a.OwnerName.Equals(name, StringComparison.OrdinalIgnoreCase)).ToList();
-            if (accounts.Count == 0)
+            var accs = bank.GetAccounts(username);
+            if (accs.Count == 0)
             {
-                Console.WriteLine("This person has no accounts.");
+                Console.WriteLine("You must have an account first.");
                 Console.ReadKey();
                 return;
             }
 
-            int selectedIndex = 0;
-            ConsoleKey key;
-            while (true)
-            {
-                Console.Clear();
-                Console.WriteLine($"Select account to add balance to for {name}:");
-                for (int i = 0; i < accounts.Count; i++)
-                {
-                    if (i == selectedIndex)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine($"> {accounts[i].AccountId} | Balance: {accounts[i].Balance:C}");
-                        Console.ResetColor();
-                    }
-                    else
-                    {
-                        Console.WriteLine($"  {accounts[i].AccountId} | Balance: {accounts[i].Balance:C}");
-                    }
-                }
+            var acc = accs.First();
 
-                key = Console.ReadKey(true).Key;
-                if (key == ConsoleKey.Enter)
-                {
-                    break;
-                }
-                if (key == ConsoleKey.W || key == ConsoleKey.UpArrow)
-                {
-                    selectedIndex = (selectedIndex > 0) ? selectedIndex - 1 : accounts.Count - 1;
-                }
-                else if (key == ConsoleKey.S || key == ConsoleKey.DownArrow)
-                {
-                    selectedIndex = (selectedIndex < accounts.Count - 1) ? selectedIndex + 1 : 0;
-                }
+            Console.Write("Enter amount: ");
+            if (!decimal.TryParse(Console.ReadLine(), out decimal amt))
+            {
+                AddBalance(username); // Re-prompt recursively
             }
 
-            var account = accounts[selectedIndex];
-            Console.Write("Enter amount to add: ");
-            if (!decimal.TryParse(Console.ReadLine(), out decimal amount) || amount <= 0)
-            {
-                Console.WriteLine("Invalid amount.");
-                Console.ReadKey();
-                return;
-            }
-
-            account.Balance += amount;
+            acc.Balance += amt;
             bank.SaveData();
+        }
 
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"Added {amount:C} to {account.AccountId}. New balance: {account.Balance:C}");
-            Console.ResetColor();
-            Console.ReadKey();
+        // Reads password input with * masking
+        static string ReadPassword()
+        {
+            string pass = "";
+            ConsoleKey key;
+
+            while ((key = Console.ReadKey(true).Key) != ConsoleKey.Enter)
+            {
+                // Handle backspace
+                if (key == ConsoleKey.Backspace && pass.Length > 0)
+                {
+                    pass = pass.Substring(0, pass.Length - 1);
+                    Console.Write("\b \b");
+                }
+                // Add character if valid
+                else if (!char.IsControl((char)key))
+                {
+                    pass += (char)key;
+                    Console.Write("*");
+                }
+            }
+            return pass;
         }
     }
 }
